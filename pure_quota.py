@@ -1,10 +1,18 @@
-import pypureclient
-from pypureclient.flashblade.client import Client
+# import pypureclient
+# from pypureclient.flashblade.client import Client
+import purity_fb
+#from purity_fb import PurityFb, rest
 import textwrap
 import argparse
 import yaml
 import logging
 import os
+import json
+import urllib3
+from purity_fb import PurityFb, FileSystem, Reference, NfsRule, rest
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+urllib3_log = logging.getLogger("urllib3")
+urllib3_log.setLevel(logging.CRITICAL)
 import sys
 
 logger = logging.getLogger('pure_fs')
@@ -87,29 +95,35 @@ class FlashBlade:
     def __init__(self, array):
         self.filesystems = []
         self.fs_names = []
+        fb = PurityFb(array['ip-address'])
+        fb.disable_verify_ssl()
         try:
-            self.client = Client(array['ip-address'], api_token=array['api-token'])
-        except:
-            raise CanNotEstablishArraySession(array['name'])
+            res = fb.login(array['api-token'])
+            self.client = fb
+
+        except rest.ApiException as e:
+            print("Exception when logging in to the array: %s\n" % e)
 
 
-    def list_quotas(self, filesystems):
+    def list_quotas(self, filesystem):
         # List all user quotas for the file system
-        res = self.client.get_quotas_users(file_system_names=filesystems)
-        # print(list(res.items))
-        if type(res) == pypureclient.responses.ValidResponse:
-            return list(res.items)
-        # Other valid fields: continuation_token, file_system_ids, filter, limit, names, offset, sort,
-        #                     uids, user_names
-        # See section "Common Fields" for examples
+        res = ''
+        try:
+            res = self.client.quotas_users.list_user_quotas(file_system_names=[filesystem]).to_dict()['items']
+        except rest.ApiException as e:
+            print("Exception when creating file system or listing user quotas: %s\n" % e)
+
+        return res
+
 
     def get_filesystems(self):
-        res = self.client.get_file_systems()
-        if type(res) == pypureclient.responses.ValidResponse:
+        res = ''
+        try:
+            res = self.client.file_systems.list_file_systems().to_dict()['items']
+        except rest.ApiException as e:
+            print("failed.")
 
-            self.filesystems = list(res.items)
-            self.fs_names = [fs.name for fs in self.filesystems]
-            return self.filesystems
+        self.filesystems = [each['name'] for each in res]
 
     def print_filesystems(self):
 
@@ -183,32 +197,31 @@ def main():
     if args.f:
         quotas = array.list_quotas(args.f)
         for quota in quotas:
-            if args.u and args.u == str(quota.to_dict()['user']['name']):
+            if args.u and args.u == str(quota['user']['name']):
                 if args.c:
-                    to_csv(quota.to_dict(), args.n)
+                    to_csv(quota, args.n)
                 else:
-                    to_screen(quota.to_dict(), args.n)
+                    to_screen(quota, args.n)
             elif not args.u:
                 if args.c:
-                    to_csv(quota.to_dict(), args.n)
+                    to_csv(quota, args.n)
                 else:
-                    to_screen(quota.to_dict(), args.n)
+                    to_screen(quota, args.n)
         exit()
     else:
-        for name in array.fs_names:
-            quotas = array.list_quotas([name])
+        for name in array.filesystems:
+            quotas = array.list_quotas(name)
             for quota in quotas:
-                if args.u and args.u == str(quota.to_dict()['user']['name']):
+                if args.u and args.u == str(quota['user']['name']):
                     if args.c:
-                        to_csv(quota.to_dict(), args.n)
+                        to_csv(quota, args.n)
                     else:
-                        to_screen(quota.to_dict(), args.n)
+                        to_screen(quota, args.n)
                 if not args.u:
                     if args.c:
-                        to_csv(quota.to_dict(), args.n)
+                        to_csv(quota, args.n)
                     else:
-                        to_screen(quota.to_dict(), args.n)
-
+                        to_screen(quota, args.n)
 
 if __name__ == "__main__":
     main()
