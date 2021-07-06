@@ -8,6 +8,7 @@ import yaml
 import logging
 import os
 import json
+from pprint import pprint
 import urllib3
 from purity_fb import PurityFb, FileSystem, Reference, NfsRule, rest
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -109,7 +110,8 @@ class FlashBlade:
         # List all user quotas for the file system
         res = ''
         try:
-            res = self.client.quotas_users.list_user_quotas(file_system_names=[filesystem]).to_dict()['items']
+            #res = self.client.quotas_users.list_user_quotas(file_system_names=[filesystem]).to_dict()['items']
+            res = self.client.usage_users.list_user_usage(file_system_names=[filesystem]).to_dict()['items']
         except rest.ApiException as e:
             print("Exception when creating file system or listing user quotas: %s\n" % e)
 
@@ -191,7 +193,12 @@ def main():
 
     array = FlashBlade(creds)
     array.get_filesystems()
+    for name in array.filesystems:
+        quotas = array.list_quotas(name)
+        for quota in quotas:
+            pprint(quota)
 
+    '''
     if not args.c:
         print_header()
     if args.f:
@@ -222,6 +229,8 @@ def main():
                         to_csv(quota, args.n)
                     else:
                         to_screen(quota, args.n)
+        
+    '''
 
 if __name__ == "__main__":
     main()
