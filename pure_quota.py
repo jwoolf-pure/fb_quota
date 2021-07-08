@@ -1,7 +1,4 @@
-# import pypureclient
-# from pypureclient.flashblade.client import Client
 import purity_fb
-#from purity_fb import PurityFb, rest
 import textwrap
 import argparse
 import yaml
@@ -16,7 +13,7 @@ urllib3_log = logging.getLogger("urllib3")
 urllib3_log.setLevel(logging.CRITICAL)
 import sys
 
-logger = logging.getLogger('pure_fs')
+logger = logging.getLogger('fb_quota')
 logger.setLevel('ERROR')
 ch = logging.StreamHandler()
 ch.setLevel('ERROR')
@@ -114,6 +111,7 @@ class FlashBlade:
             res = self.client.usage_users.list_user_usage(file_system_names=[filesystem]).to_dict()['items']
         except rest.ApiException as e:
             print("Exception when creating file system or listing user quotas: %s\n" % e)
+            sys.exit(1)
 
         return res
 
@@ -148,9 +146,7 @@ def print_header():
     ))
 
 def to_screen(data, fb):
-    data['file_system_default_quota'] = round(data['file_system_default_quota'] / 1024 ** 3, 2)
-    data['quota'] = round(data['quota'] / 1024 **3, 2)
-    data['usage'] = round(data['usage'] / 1024 **3, 2)
+
     print('{:<15}{:<15}{:<18}{:<12}{:<10}{:<18}{:<10}{:<10}'.format(
                                                   fb,
                                                   data['file_system']['name'],
@@ -159,14 +155,12 @@ def to_screen(data, fb):
                                                   str(data['user']['id']),
                                                   str(data['quota']),
                                                   str(data['usage']),
-                                                  str(round(data['usage'] / data['quota'] * 100, 2)),
+                                                  str(data['percent'])
                                                   )
     )
 
 def to_csv(data, fb):
-    data['file_system_default_quota'] = round(data['file_system_default_quota'] / 1024 **3, 2)
-    data['quota'] = round(data['quota'] / 1024 **3, 2)
-    data['usage'] = round(data['usage'] / 1024 **3, 2)
+
     print(
         fb + ',' +\
         data['file_system']['name'] + ',' +\
@@ -175,7 +169,7 @@ def to_csv(data, fb):
         str(data['user']['id']) + ',' + \
         str(data['quota']) + ',' + \
         str(data['usage']) + ',' + \
-        str(round(data['usage'] / data['quota'] * 100, 2))
+        str(data['percent'])
             )
 
 def main():
@@ -193,17 +187,38 @@ def main():
 
     array = FlashBlade(creds)
     array.get_filesystems()
-    for name in array.filesystems:
-        quotas = array.list_quotas(name)
-        for quota in quotas:
-            pprint(quota)
+    #for name in array.filesystems:
+    #    quotas = array.list_quotas(name)
+    #    for quota in quotas:
+    #        pprint(quota)
 
-    '''
     if not args.c:
         print_header()
     if args.f:
         quotas = array.list_quotas(args.f)
         for quota in quotas:
+
+            if quota['file_system_default_quota']:
+                quota['file_system_default_quota'] = round(quota['file_system_default_quota'] / 1024 ** 3, 2)
+            else:
+                quota['file_system_default_quota'] = 0
+            if quota['quota']:
+                quota['quota'] = round(quota['quota'] / 1024 ** 3, 2)
+            else:
+                quota['quota'] = 0
+            if quota['usage']:
+                quota['usage'] = round(quota['usage'] / 1024 ** 3, 2)
+            else:
+                quota['usage'] = 0
+
+            try:
+                quota['percent'] = str(round(quota['usage'] / quota['quota'] * 100, 2))
+            except:
+                try:
+                    quota['percent'] = str(round(['usage'] / quota['file_system_default_quota'] * 100, 2))
+                except:
+                    quota['percent'] = "0"
+
             if args.u and args.u == str(quota['user']['name']):
                 if args.c:
                     to_csv(quota, args.n)
@@ -230,7 +245,6 @@ def main():
                     else:
                         to_screen(quota, args.n)
         
-    '''
 
 if __name__ == "__main__":
     main()
