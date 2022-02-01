@@ -134,8 +134,8 @@ class FlashBlade:
             print(each.name)
 
 def print_header():
-    print('{:<15}{:<15}{:<18}{:<12}{:<10}{:<18}{:<10}{:<10}'.format(
-        'FlashBlade',
+    print('{:<15}{:<30}{:<18}{:<12}{:<10}{:<18}{:<10}{:<10}'.format(
+            'FlashBlade',
         'Filesystem',
         'DefaultQuota(Gb)',
         'User',
@@ -147,16 +147,16 @@ def print_header():
 
 def to_screen(data, fb):
 
-    print('{:<15}{:<15}{:<18}{:<12}{:<10}{:<18}{:<10}{:<10}'.format(
-                                                  fb,
-                                                  data['file_system']['name'],
-                                                  data['file_system_default_quota'],
-                                                  str(data['user']['name']),
-                                                  str(data['user']['id']),
-                                                  str(data['quota']),
-                                                  str(data['usage']),
-                                                  str(data['percent'])
-                                                  )
+    print('{:<15}{:<30}{:<18}{:<12}{:<10}{:<18}{:<10}{:<10}'.format(
+                                                    fb,
+                                                    data['file_system']['name'],
+                                                    data['file_system_default_quota'],
+                                                    str(data['user']['name']),
+                                                    str(data['user']['id']),
+                                                    str(data['quota']),
+                                                    str(data['usage']),
+                                                    str(data['percent']
+                                                    ))
     )
 
 def to_csv(data, fb):
@@ -219,6 +219,9 @@ def main():
                 except:
                     quota['percent'] = "0"
 
+            if quota['quota'] == 0:
+                quota['quota'] = quota['file_system_default_quota']
+
             if args.u and args.u == str(quota['user']['name']):
                 if args.c:
                     to_csv(quota, args.n)
@@ -234,6 +237,32 @@ def main():
         for name in array.filesystems:
             quotas = array.list_quotas(name)
             for quota in quotas:
+
+                if quota['file_system_default_quota']:
+                    quota['file_system_default_quota'] = round(quota['file_system_default_quota'] / 1024 ** 3, 2)
+                else:
+                    quota['file_system_default_quota'] = 0
+                if quota['quota']:
+                    quota['quota'] = round(quota['quota'] / 1024 ** 3, 2)
+                else:
+                    quota['quota'] = 0
+                if quota['usage']:
+                    quota['usage'] = round(quota['usage'] / 1024 ** 3, 2)
+                else:
+                    quota['usage'] = 0
+
+                try:
+                    quota['percent'] = str(round(quota['usage'] / quota['quota'] * 100, 2))
+                except:
+                    try:
+                        quota['percent'] = str(round(['usage'] / quota['file_system_default_quota'] * 100, 2))
+                    except:
+                        quota['percent'] = "0"
+
+                if quota['quota'] == 0:
+                    quota['quota'] = quota['file_system_default_quota']
+
+
                 if args.u and args.u == str(quota['user']['name']):
                     if args.c:
                         to_csv(quota, args.n)
